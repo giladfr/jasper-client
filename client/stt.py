@@ -122,8 +122,18 @@ class PocketSphinxSTT(AbstractSTTEngine):
                                  "hmm_dir in your profile.",
                                  hmm_dir, ', '.join(missing_hmm_files))
 
-        self._decoder = ps.Decoder(hmm=hmm_dir, logfn=self._logfile,
-                                   **vocabulary.decoder_kwargs)
+        print vocabulary.decoder_kwargs
+
+        config = ps.Decoder.default_config()
+        config.set_string('-hmm', hmm_dir)
+        config.set_string('-logfn', self._logfile)
+        config.set_string('-lm', vocabulary.decoder_kwargs["lm"])
+        config.set_string('-dict', vocabulary.decoder_kwargs["dict"])
+
+
+        self._decoder = ps.Decoder(config)
+        # self._decoder = ps.Decoder(hmm=hmm_dir, logfn=self._logfile,
+        #                            **vocabulary.decoder_kwargs)
 
     def __del__(self):
         os.remove(self._logfile)
@@ -163,13 +173,17 @@ class PocketSphinxSTT(AbstractSTTEngine):
         self._decoder.process_raw(data, False, True)
         self._decoder.end_utt()
 
-        result = self._decoder.get_hyp()
+        result = [seg.word for seg in self._decoder.seg()]
         with open(self._logfile, 'r+') as f:
             for line in f:
                 self._logger.debug(line.strip())
             f.truncate()
 
-        transcribed = [result[0]]
+        if result:
+            transcribed = result
+        else:
+            transcribed = []
+
         self._logger.info('Transcribed: %r', transcribed)
         return transcribed
 
